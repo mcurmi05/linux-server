@@ -1,0 +1,11 @@
+services:
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    ports:
+      - 13378:80
+    volumes:
+      - audiobookslocationpathname:/audiobooks
+      - ./config:/config
+      - metadatalocationpathname(getsbigsoexternalhddforme):/metadata
+    environment:
+      - TZ=America/Toronto

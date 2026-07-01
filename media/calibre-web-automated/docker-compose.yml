@@ -1,0 +1,20 @@
+---
+services:
+  calibre-web-automated:
+    image: crocodilestick/calibre-web-automated:latest
+    container_name: calibre-web-automated
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+      - HARDCOVER_TOKEN=enterhardcoverapitokenhere
+      - NETWORK_SHARE_MODE=false
+      - CWA_AUTOCONVERT=false
+    volumes:
+      - ./config:/config
+      - ingestlocationpathname:/cwa-book-ingest
+      - librarylocationpathname:/calibre-library
+      - ./plugins:/config/.config/calibre/plugins
+    ports:
+      - 8083:8083
+    restart: unless-stopped

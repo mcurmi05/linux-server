@@ -1,0 +1,233 @@
+services:
+
+  #cloudflared----------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - insertokenhere
+  #---------------------------------------
+
+  #dashboards---------------------------------------------
+  portainer:
+    image: portainer/portainer
+    container_name: portainer
+    restart: always
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./dashboards/portainer/data:/data
+  homarr:
+    container_name: homarr
+    image: ghcr.io/ajnart/homarr:latest
+    restart: unless-stopped
+    volumes:
+      - ./dashboards/homarr/configs:/app/data/configs
+      - ./dashboards/homarr/icons:/app/public/icons
+      - ./dashboards/homarr/data:/data
+    ports:
+      - '7575:7575'
+  #-------------------------------------------------------
+
+  #file-management-----------------------------------------
+  syncthing:
+    image: lscr.io/linuxserver/syncthing:latest
+    container_name: syncthing
+    hostname: syncthing
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./file-management/syncthing/config:/config
+      - syncthingfolderlocationpathname:/data1
+    ports:
+      - 8384:8384
+      - 22000:22000/tcp
+      - 22000:22000/udp
+      - 21027:21027/udp
+    restart: unless-stopped
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    ports:
+      - "8151:80"
+    volumes:
+      - /srv:/srv
+      - ./file-management/filebrowser/config:/config
+      - ./file-management/filebrowser/database:/database
+    restart: unless-stopped
+    environment:
+    - PUID=1000
+    - PGID=1000
+  #-------------------------------------------------------
+ 
+  #media-------------------------------------------------------------------
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    network_mode: bridge
+    ports:
+      - 8096:8096
+    volumes:
+      - ./media/jellyfin/config:/config
+      - ./media/jellyfin/cache:/cache
+      - medialocationpathname:/media
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Sydney
+
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    ports:
+      - 13378:80
+    volumes:
+      - audiobookslocationpathname:/audiobooks
+      - ./media/audiobookshelf/config:/config
+      - metadatalocationpathname(getsbigsoexternalhddforme):/metadata
+    environment:
+      - TZ=America/Toronto
+
+  calibre-web-automated:
+    image: crocodilestick/calibre-web-automated:latest
+    container_name: calibre-web-automated
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+      - HARDCOVER_TOKEN=enterhardcoverapitokenhere
+      - NETWORK_SHARE_MODE=false
+      - CWA_AUTOCONVERT=false
+    volumes:
+      - ./media/calibre-web-automated/config:/config
+      - ingestlocationpathname:/cwa-book-ingest
+      - librarylocationpathname:/calibre-library
+      - ./media/calibre-web-automated/plugins:/config/.config/calibre/plugins
+    ports:
+      - 8083:8083
+    restart: unless-stopped
+
+  koreader:
+    image: wardwouts/koreader-novnc
+    container_name: koreader
+    ports:
+      - "8082:8080"
+    environment:
+      - CURSOR=
+      - EMULATE_READER_H="1080"
+      - EMULATE_READER_W="1920"
+    volumes:
+      - bookslocationpathname:/books
+      - ./media/koreader-novnc/config:/config
+      - passwd:/passwd
+      - fonts:/usr/lib/koreader/fonts/myfonts
+    restart: unless-stopped
+  #----------------------------------------------------------------------------
+
+  #arr-stack-------------------------------------------------
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - "./media/arr stack/prowlarr/config:/config"
+    ports:
+      - 9696:9696
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./media/arr-stack/radarr/config:/config
+      - medialocationpathname:/media
+      - torrentingdownloadslocationpathname:/downloads
+    ports:
+      - 7878:7878
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./media/arr-stack/sonarr/config:/config
+      - medialocationpathname:/media
+      - torrentingdownloadslocationpathname:/downloads
+    ports:
+      - 8989:8989
+    restart: unless-stopped
+
+  seerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    init: true
+    container_name: seerr
+    environment:
+      - LOG_LEVEL=debug
+      - TZ=Asia/Tashkent
+      - PORT=5055
+    ports:
+      - 5055:5055
+    volumes:
+      - ./media/arr-stack/seerr/config:/app/config
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
+    restart: unless-stopped
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FILE=${LOG_FILE:-none}
+      - LOG_HTML=${LOG_HTML:-false}
+      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
+      - TZ=Europe/London
+    ports:
+      - "${PORT:-8191}:8191"
+    volumes:
+      - ./media/arr-stack/flaresolverr/config:/config
+    restart: unless-stopped
+  #----------------------------------------------------------
+
+  #qbittorent--------------------------------------------
+  qbittorrent:
+    image: linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - WEBUI_PORT=8080
+    volumes:
+      - ./qbittorent/config:/config
+      - torrentingdownloadslocationpathname:/downloads
+  #------------------------------------------------------
+
+volumes:
+  passwd:
+  fonts:
